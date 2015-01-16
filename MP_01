@@ -1,6 +1,14 @@
 // MP 1
 #include <wb.h>
 
+#define wbCheck(stmt) do { 							\
+	cudaError_t err = stmt; 						\
+	if (err != cudaSuccess) { 						\
+		wbLog(ERROR, "Failed to run stmt ", #stmt); \
+		return -1; 									\
+	} 												\
+} while(0)
+
 __global__ void vecAdd(float *in1, float *in2, float *out, int len) {
   //@@ Insert code to implement vector addition here
 }
@@ -26,13 +34,16 @@ int main(int argc, char **argv) {
   wbLog(TRACE, "The input length is ", inputLength);
 
   wbTime_start(GPU, "Allocating GPU memory.");
-  //@@ Allocate GPU memory here
-
+	size_t size = n * sizeof(float);
+	wbLog(TRACE, "Allocating ", size, " bytes");
+	wbCheck(cudaMalloc((void **) &deviceInput1, size));
+	wbCheck(cudaMalloc((void **) &deviceInput2, size));
+	wbCheck(cudaMalloc((void **) &deviceOutput, size));  
   wbTime_stop(GPU, "Allocating GPU memory.");
 
   wbTime_start(GPU, "Copying input memory to the GPU.");
-  //@@ Copy memory to the GPU here
-
+	wbCheck(cudaMemcpy(deviceInput1,hostInput1,size,cudaMemcpyHostToDevice));
+	wbCheck(cudaMemcpy(deviceInput2,hostInput2,size,cudaMemcpyHostToDevice));
   wbTime_stop(GPU, "Copying input memory to the GPU.");
 
   //@@ Initialize the grid and block dimensions here
@@ -44,13 +55,13 @@ int main(int argc, char **argv) {
   wbTime_stop(Compute, "Performing CUDA computation");
 
   wbTime_start(Copy, "Copying output memory to the CPU");
-  //@@ Copy the GPU memory back to the CPU here
-
+	wbCheck(cudaMemcpy(hostOutput,deviceOutput,size,cudaMemcpyDeviceToHost));
   wbTime_stop(Copy, "Copying output memory to the CPU");
 
   wbTime_start(GPU, "Freeing GPU Memory");
-  //@@ Free the GPU memory here
-
+	wbCheck(cudaFree(deviceInput1));
+	wbCheck(cudaFree(deviceInput2));
+	wbCheck(cudaFree(deviceOutput));
   wbTime_stop(GPU, "Freeing GPU Memory");
 
   wbSolution(args, hostOutput, inputLength);
