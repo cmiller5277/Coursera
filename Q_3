@@ -1,0 +1,109 @@
+
+Question 1
+We are to process a 600X800 (800 pixels in the x or horizontal direction, 600 pixels in the y or vertical direction) picture with the PictureKernel(). That is m’s value is 600 and n’s value is 800.
+
+__global__ void PictureKernel(float* d_Pin, float* d_Pout, int n, int m) {
+
+  // Calculate the row # of the d_Pin and d_Pout element to process
+  int Row = blockIdx.y*blockDim.y + threadIdx.y;
+
+  // Calculate the column # of the d_Pin and d_Pout element to process
+  int Col = blockIdx.x*blockDim.x + threadIdx.x;
+
+  // each thread computes one element of d_Pout if in range
+  if ((Row < m) && (Col < n)) {
+    d_Pout[Row*n+Col] = 2*d_Pin[Row*n+Col];
+  }
+}
+
+Assume that we decided to use a grid of 16X16 blocks. That is, each block is organized as a 2D 16X16 array of threads. How many warps will be generated during the execution of the kernel?
+Your Answer 		Score 	Explanation
+38*50 			
+37*16 			
+38*50*2 			
+[x] 38*8*50 	Correct 	1.00 	There are ceil(800/16.0) = 50 blocks in the x direction and ceil(600/16.0) = 38 blocks in the y direction. Each block contributes (16*16)/32 = 8 warps. So there are 38*50*8 warps.
+	
+Question 2
+In Question 1, how many warps will have control divergence?
+Your Answer 		Score 	Explanation
+50 			
+38*16 			
+37 + 50*8 			
+[x] 0 	Correct 	1.00 	The size of the picture in the x dimension is a multiple of 16 so there is no block in the x direction that has any threads in the invalid range. The size of the picture in the y dimension is 37.5 times of 16. This means that the threads in the last block are divided into halves: 128 in the valid range and 128 in the invalid range. Since 128 is a multiple of 32, all warps will fall into either one or the other range. There is no control divergence.
+	
+Question 3
+In Question 1, if we are to process an 800x600 picture (600 pixels in the x or horizontal direction and 800 pixels in the y or vertical direction) picture, how many warps will have control divergence?
+Your Answer 		Score 	Explanation
+[x] 50*8 	Correct 	1.00 	The size of the picture in the x dimension is 600, which is 37.5 times of 16. This means that every warp processing the right edge of the picture will have control divergence. There are 50*8 such warps (50 blocks, 8 warps in each block). Since the size of the picture in the y dimension is a multiple of 16, there is no more divergence in the warps that process the lower edge of the picture.
+37+50*8 			
+38*16 			
+0 			
+
+Question 4
+In Question 1, if are to process a 799x600 picture (600 pixels in the x direction and 799 pixels in the y direction), how many warps will have control divergence?
+Your Answer 		Score 	Explanation
+50*8 			
+[x] 37+50*8 	Correct 	1.00 	The number of warps processing the right edge remains 50*8, all of which will have control divergence. However, the warps processing the lower edge of the picture will also have control divergence. There are 38 of them. One of them is already counted for processing the right edge. So we have 50*8+38-1 = 50*8+37.
+(37+50)*8 			
+0 			
+
+Question 5
+Assume the following simple matrix multiplication kernel
+
+__global__ void MatrixMulKernel(float* M, float* N, float* P, int Width)
+{
+  int Row = blockIdx.y*blockDim.y+threadIdx.y;
+  int Col = blockIdx.x*blockDim.x+threadIdx.x;
+  if ((Row < Width) && (Col < Width)) {
+    float Pvalue = 0;
+    for (int k = 0; k < Width; ++k) {Pvalue += M[Row*Width+k] * N[k*Width+Col];}
+    P[Row*Width+Col] = Pvalue;
+  }
+}
+
+If we launch the kernel with a block size of 16X16 on a 1000X1000 matrix, how many warps will have control divergence?
+Your Answer 		Score 	Explanation
+[x] 500 	Correct 	1.00 	There will be 63 blocks in the horizontal direction. 8 threads in the x dimension in each row will be in the invalid range. Every two rows form a warp. Therefore, there are 1000/2 =500 warps that will straddle the valid and invalid ranges in the horizontal direction. As for the warps in the bottom blocks, there are 8 warps in the valid range and 8 warps in the invalid range. Threads in these warps are either totally in the valid range or invalid range.
+1,000 			
+1,008 			
+508 		
+	
+Question 6
+If a CUDA device’s SM (streaming multiprocessor) can take up to 1,536 threads and up to 8 thread blocks. Which of the following block configuration would result in the most number of threads in each SM?Question text
+Your Answer 		Score 	Explanation
+64 threads per block 			
+1,024 threads per block 			
+128 threads per block 			
+[x] 512 threads per block 	Correct 	1.00 	Answer results in 3 blocks and fully occupies the capacity of 1,536 threads in each SM.
+
+Question 7
+Assume that a kernel is launched with 1000 thread blocks each of which has 512 threads. If a variable is declared as a shared memory variable, how many versions of the variable will be created through the lifetime of the execution of the kernel?
+Your Answer 		Score 	Explanation
+1 			
+[x] 1,000 	Correct 	1.00 	Shared memory variables are allocated to thread blocks. So, the number of versions is the number of thread blocks, 1,000.
+512,000 			
+512 			
+	
+Question 8
+For our tiled matrix-matrix multiplication kernel, if we use a 32X32 tile, what is the reduction of memory bandwidth usage for input matrices A and B?
+Your Answer 		Score 	Explanation
+1/8 of the original usage 			
+1/16 of the original usage 			
+1/64 of the original usage 			
+[x] 1/32 of the original usage 	Correct 	1.00 	Each element in the tile is used 32 times, as explained in Lecture 2.6.
+	
+Question 9
+For the tiled single-precision matrix multiplication kernel as shown in Lecture 2.6, assume that the tile size is 32X32 and the system has a DRAM bust size of 128 bytes. How many DRAM bursts will be delivered to the processor as a result of loading one A-matrix tile by a thread block?
+Your Answer 		Score 	Explanation
+[x] 32 	Correct 	1.00 	For an 32X32 A-tile, each row in the tile consists of 32 consecutive words and is accessed by a warp. The total amount of data in the row is just a single burst. We have 32 rows in a tile so there will be 32 bursts delivered to the processor.
+128 			
+16 			
+64 			
+	
+Question 10
+Assume a tiled matrix multiplication that handles boundary conditions as explained in Lecture 2.8. Assume that we use 32X32 tiles to process square matrices of 1,000X1,000. Within EACH thread block, what is the maximal number of warps that will have control divergence due to handling boundary conditions for loading A tiles throughout the kernel execution?
+Your Answer 		Score 	Explanation
+8 			
+24 			
+16 			
+[x] 32 	Correct 	1.00 	Control divergence happens due to the handling of the right edge. For thread blocks processing tiles that are totally within the valid range in the y-dimension, all 32 warps in a block will experience divergence at the right boundary. For the thread blocks that process the bottom A tiles on the right edge, only 8 warps will experience control divergence because all threads in the lower 24 warps will fail the boundary test.
